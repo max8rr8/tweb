@@ -916,7 +916,7 @@ export default class ChatContextMenu {
             return;
           }
 
-          this.chat.sendReaction({message: reactionsMessage, reaction});
+          this.managers.appReactionsManager.sendReaction(reactionsMessage, reaction);
         },
         getOpenPosition: (hasMenu) => {
           const rect = reactionsMenu.container.getBoundingClientRect();

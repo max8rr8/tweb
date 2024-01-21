@@ -19,7 +19,7 @@ import {AppManager} from './manager';
 import getPeerId from './utils/peers/getPeerId';
 
 export type GroupCallId = GroupCall['id'];
-export type MyGroupCall = GroupCall | InputGroupCall;
+export type MyGroupCall = (GroupCall | InputGroupCall) & { chat_id?: ChatId };
 
 export type GroupCallConnectionType = 'main' | 'presentation';
 
@@ -223,6 +223,8 @@ export class AppGroupCallsManager extends AppManager {
   }
 
   public saveGroupCall(call: MyGroupCall, chatId?: ChatId) {
+    call.chat_id = chatId;
+
     const oldCall = this.groupCalls.get(call.id);
     const shouldUpdate = call._ !== 'inputGroupCall' && (!oldCall || oldCall._ !== 'groupCallDiscarded');
     if(oldCall) {
@@ -242,12 +244,17 @@ export class AppGroupCallsManager extends AppManager {
     return call;
   }
 
-  public async createGroupCall(chatId: ChatId, scheduleDate?: number, title?: string) {
+  public async createGroupCall(chatId: ChatId, options: Partial<{
+    scheduleDate: number,
+    title: string,
+    rtmpStream: boolean
+  }> = {}) {
     const updates = await this.apiManager.invokeApi('phone.createGroupCall', {
       peer: this.appPeersManager.getInputPeerById(chatId.toPeerId(true)),
       random_id: nextRandomUint(32),
-      schedule_date: scheduleDate,
-      title
+      schedule_date: options.scheduleDate,
+      title: options.title,
+      rtmp_stream: options.rtmpStream
     });
 
     this.apiUpdatesManager.processUpdateMessage(updates);
@@ -343,6 +350,13 @@ export class AppGroupCallsManager extends AppManager {
     });
   }
 
+  public async getURLAndKey(peerId: PeerId, revoke: boolean) {
+    return this.apiManager.invokeApi('phone.getGroupCallStreamRtmpUrl', {
+      peer: this.appPeersManager.getInputPeerById(peerId),
+      revoke
+    })
+  }
+
   public async joinGroupCall(groupCallId: GroupCallId, params: DataJSON, options: GroupCallConnectionInstance['options']) {
     const groupCallInput = this.getGroupCallInput(groupCallId);
     let promise: Promise<Updates>;
@@ -380,5 +394,13 @@ export class AppGroupCallsManager extends AppManager {
     }).then((updates) => {
       this.apiUpdatesManager.processUpdateMessage(updates);
     });
+  }
+
+  public getStreamChannels(call: InputGroupCall) {
+    return this.apiManager.invokeApi('phone.getGroupCallStreamChannels', {
+      call
+    }).then(e => {
+      return e.channels
+    })
   }
 }

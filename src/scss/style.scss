@@ -275,7 +275,6 @@
   --menu-background-color: rgba(var(--surface-color-rgb), var(--backdrop-opacity));
   --rlottie-vector-fill: rgba(0, 0, 0, #{$hover-alpha});
   --limit-line-empty-background: #F1F3F5;
-  --premium-color: #9275ff;
 
   --message-time-color: var(--secondary-text-color);
   --message-checkbox-color: #61c642;
@@ -415,6 +414,7 @@
 @import "partials/row";
 @import "partials/colorPicker";
 @import "partials/replyKeyboard";
+@import "partials/stream";
 // @import "partials/peopleNearby";
 @import "partials/spoiler";
 @import "partials/emojiAnimation";
@@ -464,6 +464,7 @@
 @import "partials/popups/premium";
 @import "partials/popups/boost";
 @import "partials/popups/giftLink";
+@import "partials/popups/streamControl";
 
 @import "partials/pages/pages";
 @import "partials/pages/authCode";

@@ -302,15 +302,9 @@ export class AppImManager extends EventListenerBase<{
       });
     });
 
-    const onPeerChanging = (chat: Chat) => {
+    this.addEventListener('peer_changing', (chat) => {
       this.saveChatPosition(chat);
-    };
-
-    const onPeerChanged = () => {
-      this.addEventListener('peer_changing', onPeerChanging, {once: true});
-    };
-
-    this.addEventListener('peer_changed', onPeerChanged);
+    });
 
     rootScope.addEventListener('theme_changed', () => {
       this.applyCurrentTheme({
@@ -1498,7 +1492,7 @@ export class AppImManager extends EventListenerBase<{
   }
 
   public saveChatPosition(chat: Chat) {
-    if(!([ChatType.Chat, ChatType.Discussion, ChatType.Saved] as ChatType[]).includes(chat.type) || !chat.peerId) {
+    if(!(['chat', 'discussion'] as ChatType[]).includes(chat.type) || !chat.peerId) {
       return;
     }
 
@@ -1531,7 +1525,7 @@ export class AppImManager extends EventListenerBase<{
   }
 
   public getChatSavedPosition(chat: Chat): ChatSavedPosition {
-    if(!([ChatType.Chat, ChatType.Discussion, ChatType.Saved] as ChatType[]).includes(chat.type) || !chat.peerId) {
+    if(!(['chat', 'discussion'] as ChatType[]).includes(chat.type) || !chat.peerId) {
       return;
     }
 
@@ -2319,32 +2313,36 @@ export class AppImManager extends EventListenerBase<{
       return {cached: true, result: Promise.resolve(typingEl)};
     }
 
-    const chatFullResult = await this.managers.acknowledged.appProfileManager.getChatFull(chatId);
-    const dooo = async(chatFull: ChatFull) => {
-      let [subtitle, onlinesResult] = await Promise.all([
-        getChatMembersString(chatId, undefined, undefined, undefined, chatFull),
-        this.managers.acknowledged.appProfileManager.getOnlines(chatId)
-      ]);
+    const result = await this.managers.acknowledged.appProfileManager.getChatFull(chatId);
+    const dooo = async(chatInfo: ChatFull) => {
+      // this.chat.log('chatInfo res:', chatInfo);
 
-      return {
-        cached: onlinesResult.cached,
-        result: onlinesResult.result.then((onlines) => {
-          if(onlines > 1) {
-            const span = document.createElement('span');
+      const participants_count = (chatInfo as ChatFull.channelFull).participants_count ||
+        ((chatInfo as ChatFull.chatFull).participants as ChatParticipants.chatParticipants)?.participants?.length ||
+        1;
+      // if(participants_count) {
+      let subtitle = await getChatMembersString(chatId);
 
-            span.append(...join([subtitle, i18n('OnlineCount', [numberThousandSplitter(onlines)])], false));
-            subtitle = span;
-          }
+      if(participants_count < 2) {
+        return subtitle;
+      }
 
-          return subtitle;
-        })
-      };
+      const onlines = await this.managers.appProfileManager.getOnlines(chatId);
+      if(onlines > 1) {
+        const span = document.createElement('span');
+
+        span.append(...join([subtitle, i18n('OnlineCount', [numberThousandSplitter(onlines)])], false));
+        subtitle = span;
+      }
+
+      return subtitle;
+      // }
     };
 
-    const result = chatFullResult.result.then(dooo);
+    const promise = Promise.resolve(result.result).then(dooo);
     return {
-      cached: chatFullResult.cached ? (await result).cached : chatFullResult.cached,
-      result: result.then((r) => r.result)
+      cached: result.cached,
+      result: promise
     };
   }
 
@@ -2505,14 +2503,6 @@ export class AppImManager extends EventListenerBase<{
 
     element.style.setProperty(colorProperty, peerColorRgbValue);
     element.style.setProperty(borderBackgroundProperty, peerBorderBackgroundValue);
-  }
-
-  public async initGifting() {
-    const appConfig = await this.managers.apiManager.getAppConfig();
-    const user = await this.managers.appUsersManager.resolveUsername(appConfig.premium_bot_username);
-    const peerId = user.id.toPeerId(false);
-    this.managers.appMessagesManager.sendText({peerId, text: '/gift'});
-    this.setInnerPeer({peerId});
   }
 
   public onEmojiStickerClick = async({event, container, managers, peerId, middleware}: {

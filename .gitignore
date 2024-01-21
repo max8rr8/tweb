@@ -14,3 +14,11 @@ yarn.lock
 stats.html
 ssh.json
 archive.zip
+
+public/*.js
+public/*.js.map
+public/*.wasm
+public/*.css
+
+!public/*.min.*
+!public/rlottie-wasm*

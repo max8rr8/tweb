@@ -229,8 +229,12 @@ export default class AppSettingsTab extends SliderSuperTab {
     const giftPremium = new Row({
       titleLangKey: 'GiftPremiumGifting',
       icon: 'gift',
-      clickable: () => {
-        appImManager.initGifting();
+      clickable: async() => {
+        const appConfig = await this.managers.apiManager.getAppConfig();
+        const user = await this.managers.appUsersManager.resolveUsername(appConfig.premium_bot_username);
+        const peerId = user.id.toPeerId(false);
+        this.managers.appMessagesManager.sendText({peerId, text: '/gift'});
+        appImManager.setInnerPeer({peerId});
       },
       listenerSetter: this.listenerSetter
     });

@@ -39,6 +39,7 @@ export default class VideoPlayer extends ControlsHover {
   protected playbackRateButton: HTMLElement;
   protected pipButton: HTMLElement;
   protected toggles: HTMLElement[];
+  protected allowTogglePlay: boolean;
 
   /* protected videoParent: HTMLElement;
   protected videoWhichChild: number; */
@@ -54,7 +55,9 @@ export default class VideoPlayer extends ControlsHover {
     duration,
     onPlaybackRackMenuToggle,
     onPip,
-    onPipClose
+    onPipClose,
+    showOnLeaveToClassName,
+    allowTogglePlay = true
   }: {
     video: HTMLVideoElement,
     play?: boolean,
@@ -62,10 +65,13 @@ export default class VideoPlayer extends ControlsHover {
     duration?: number,
     onPlaybackRackMenuToggle?: VideoPlayer['onPlaybackRackMenuToggle'],
     onPip?: VideoPlayer['onPip'],
-    onPipClose?: VideoPlayer['onPipClose']
+    onPipClose?: VideoPlayer['onPipClose'],
+    showOnLeaveToClassName: string,
+    allowTogglePlay?: boolean
   }) {
     super();
 
+    this.allowTogglePlay = allowTogglePlay;
     this.video = video;
     this.wrapper = document.createElement('div');
     this.wrapper.classList.add('ckin__player');
@@ -82,7 +88,7 @@ export default class VideoPlayer extends ControlsHover {
       canHideControls: () => {
         return !this.video.paused && (!this.playbackRateButton || !this.playbackRateButton.classList.contains('menu-open'));
       },
-      showOnLeaveToClassName: 'media-viewer-caption',
+      showOnLeaveToClassName,
       ignoreClickClassName: 'ckin__controls'
     });
 
@@ -306,7 +312,9 @@ export default class VideoPlayer extends ControlsHover {
   }
 
   protected togglePlay(isPaused = this.video.paused) {
-    this.video[isPaused ? 'play' : 'pause']();
+    if(this.allowTogglePlay) {
+      this.video[isPaused ? 'play' : 'pause']();
+    }
   }
 
   private buildControls() {

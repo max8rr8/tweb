@@ -1,0 +1,76 @@
+.pinned-stream {
+    --margin: 1rem;
+
+    @include respond-to(medium-screens) {
+        body.is-right-column-shown & {
+            width: calc(100% - var(--right-column-width));
+            transition: width 0.5s ease;
+
+        }
+    }
+
+    body.is-right-column-shown & {
+    } 
+
+
+    &-join-btn {
+        position: relative;
+
+        height: 26px;
+        font-size: var(--font-size-14);
+        line-height: var(--line-height-14);
+        text-align: center;
+        border-radius: 25px;
+        margin-right: var(--margin);
+        padding: 0 9px;
+        color: #fff;
+        font-weight: var(--font-weight-bold);
+        background-color: var(--primary-color);
+        filter: hue-rotate(83deg);
+    }
+
+    &-title {
+        font-weight: var(--font-weight-bold);
+    }
+
+    &-title,
+    &-subtitle {
+        font-size: var(--font-size-14);
+        line-height: var(--line-height-14);
+        color: var(--primary-color);
+    }
+
+    &-content {
+        margin-left: var(--margin);
+    }
+
+
+    &-gradient {
+        --margin-top: 5px;
+        --margin-left: 16px;
+        --radius: 4px;
+        
+        position: absolute;
+        top: 0;
+        left: 0;
+        margin: var(--margin-top) var(--margin-left);
+        width: calc(100% - 2*var(--margin-left));
+        height: calc(100% - 2*var(--margin-top));
+        background: linear-gradient(
+            90deg,
+            rgba(69, 136, 227, 0.1) 0.79%,
+            rgba(151, 111, 255, 0.1) 54.33%,
+            rgba(228, 106, 206, 0.1) 97.09%
+        );
+        border-radius: var(--radius);
+    
+        &.quote-like-border::before {
+            border-radius: var(--radius) 0 0 var(--radius);
+        }
+    }
+
+}
+
+.not-needed {
+    display: none !important;
+}

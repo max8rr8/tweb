@@ -50,7 +50,6 @@ export default class DotRenderer implements AnimationItemWrapper {
   private longevityHandle: WebGLUniformLocation;
   private maxVelocityHandle: WebGLUniformLocation;
   private noiseMovementHandle: WebGLUniformLocation;
-  private colorHandle: WebGLUniformLocation;
   private lastDrawTime: number;
   private time: number;
   private bufferIndex: number;
@@ -68,8 +67,7 @@ export default class DotRenderer implements AnimationItemWrapper {
     maxVelocity: number,
     longevity: number,
     noiseMovement: number,
-    timeScale: number,
-    color: number
+    timeScale: number
   };
 
   public paused: boolean;
@@ -97,7 +95,7 @@ export default class DotRenderer implements AnimationItemWrapper {
     this.context = canvas.getContext('webgl2');
   }
 
-  public resize(width: number, height: number, multiply?: number, config: Partial<DotRenderer['config']> = {}) {
+  public resize(width: number, height: number, multiply?: number) {
     this.width = width;
     this.height = height;
     this.multiply = multiply;
@@ -115,9 +113,7 @@ export default class DotRenderer implements AnimationItemWrapper {
       maxVelocity: 6.,
       longevity: 1.4,
       noiseMovement: 4,
-      timeScale: .65,
-      color: 0xffffff,
-      ...config
+      timeScale: .65
     };
 
     if(this.inited) {
@@ -155,7 +151,7 @@ export default class DotRenderer implements AnimationItemWrapper {
     });
   }
 
-  private compileShaders() {
+  public compileShaders() {
     return callbackifyAll([
       this.compileShader(this.context.VERTEX_SHADER, 'assets/img/spoiler_vertex.glsl'),
       this.compileShader(this.context.FRAGMENT_SHADER, 'assets/img/spoiler_fragment.glsl')
@@ -263,11 +259,6 @@ export default class DotRenderer implements AnimationItemWrapper {
     gl.uniform1f(this.longevityHandle, config.longevity);
     gl.uniform1f(this.maxVelocityHandle, config.maxVelocity);
     gl.uniform1f(this.noiseMovementHandle, config.noiseMovement);
-    gl.uniform3f(this.colorHandle,
-      ((config.color >> 16) & 0xff) / 0xff,
-      ((config.color >> 8) & 0xff) / 0xff,
-      (config.color & 0xff) / 0xff
-    );
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer[this.bufferIndex]);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 24, 0);
     gl.enableVertexAttribArray(0);
@@ -340,7 +331,7 @@ export default class DotRenderer implements AnimationItemWrapper {
     });
   }
 
-  private _init(vertexShader: WebGLShader, fragmentShader: WebGLShader) {
+  public _init(vertexShader: WebGLShader, fragmentShader: WebGLShader) {
     this.genBuffer();
 
     const gl = this.context;
@@ -370,7 +361,6 @@ export default class DotRenderer implements AnimationItemWrapper {
     this.longevityHandle = gl.getUniformLocation(program, 'longevity');
     this.maxVelocityHandle = gl.getUniformLocation(program, 'maxVelocity');
     this.noiseMovementHandle = gl.getUniformLocation(program, 'noiseMovement');
-    this.colorHandle = gl.getUniformLocation(program, 'color');
 
     gl.clearColor(0, 0, 0, 0);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -381,7 +371,7 @@ export default class DotRenderer implements AnimationItemWrapper {
     this.lastDrawTime = Date.now();
   }
 
-  private init() {
+  public init() {
     return callbackify(this.compileShaders(), (shaders) => {
       this._init(...shaders);
       this.draw();
@@ -404,15 +394,13 @@ export default class DotRenderer implements AnimationItemWrapper {
     height,
     middleware,
     animationGroup,
-    multiply,
-    config
+    multiply
   }: {
     width?: number,
     height?: number,
     middleware: Middleware,
     animationGroup: AnimationItemGroup,
-    multiply?: number,
-    config?: Partial<DotRenderer['config']>
+    multiply?: number
   }) {
     const index = ++this.createdIndex;
     const dotRenderer = new DotRenderer();
@@ -442,7 +430,7 @@ export default class DotRenderer implements AnimationItemWrapper {
 
     return {
       dotRenderer,
-      readyResult: width && (dotRenderer.resize(width, height, multiply, config), dotRenderer.init())
+      readyResult: width && (dotRenderer.resize(width, height, multiply), dotRenderer.init())
     };
   }
 }

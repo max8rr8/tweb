@@ -16,6 +16,7 @@ import ButtonIcon from '../buttonIcon';
 import ButtonMenuToggle from '../buttonMenuToggle';
 import ChatAudio from './audio';
 import ChatPinnedMessage from './pinnedMessage';
+import ChatJoinStream from './stream';
 import ListenerSetter from '../../helpers/listenerSetter';
 import PopupDeleteDialog from '../popups/deleteDialog';
 import appNavigationController from '../appNavigationController';
@@ -28,7 +29,7 @@ import cancelEvent from '../../helpers/dom/cancelEvent';
 import {attachClickEvent} from '../../helpers/dom/clickEvent';
 import {toast, toastNew} from '../toast';
 import replaceContent from '../../helpers/dom/replaceContent';
-import {ChatFull, Chat as MTChat, GroupCall, Dialog} from '../../layer';
+import {ChatFull, Chat as MTChat, Dialog} from '../../layer';
 import PopupPickUser from '../popups/pickUser';
 import PopupPeer, {PopupPeerCheckboxOptions} from '../popups/peer';
 import AppEditContactTab from '../sidebarRight/tabs/editContact';
@@ -58,7 +59,9 @@ import createBadge from '../../helpers/createBadge';
 import PopupBoostsViaGifts from '../popups/boostsViaGifts';
 import AppStatisticsTab from '../sidebarRight/tabs/statistics';
 import {ChatType} from './chat';
-import AppBoostsTab from '../sidebarRight/tabs/boosts';
+import PopupStreamControl, {KeyUrlElementsController} from '../popups/streamControl';
+import AppMediaViewerStream from '../appMediaViewerStream';
+import {LiveStream} from '../../lib/calls/livestream/livestream';
 
 type ButtonToVerify = {element?: HTMLElement, verify: () => boolean | Promise<boolean>};
 
@@ -86,6 +89,7 @@ export default class ChatTopbar {
   private chatRequests: ChatRequests;
   private chatAudio: ChatAudio;
   public pinnedMessage: ChatPinnedMessage;
+  public joinStream: ChatJoinStream;
 
   private setUtilsRAF: number;
 
@@ -162,6 +166,7 @@ export default class ChatTopbar {
     this.chatAudio = new ChatAudio(this, this.chat, this.managers);
     this.chatRequests = new ChatRequests(this, this.chat, this.managers);
     this.chatActions = new ChatActions(this, this.chat, this.managers);
+    this.joinStream = new ChatJoinStream(this, this.chat, this.managers);
 
     if(this.menuButtons.length) {
       this.btnMore = ButtonMenuToggle({
@@ -211,6 +216,13 @@ export default class ChatTopbar {
 
     if(this.chatActions) {
       this.container.append(this.chatActions.divAndCaption.container);
+    }
+
+    if(this.joinStream) {
+      this.joinStream.attachJoinCallback(() => {
+        this.onJoinGroupCallClick();
+      })
+      this.container.append(this.joinStream.divAndCaption.container);
     }
 
     // * construction end
@@ -334,6 +346,9 @@ export default class ChatTopbar {
     }
 
     const chat = apiManagerProxy.getChat(chatId);
+    if(this.managers.appPeersManager.isBroadcast(this.peerId) && !hasRights(chat, 'manage_call')) {
+      return false;
+    }
     return (chat as MTChat.chat).pFlags?.call_active || hasRights(chat, 'manage_call');
   };
 
@@ -398,12 +413,12 @@ export default class ChatTopbar {
     }, {
       icon: 'videochat',
       text: 'PeerInfo.Action.LiveStream',
-      onClick: this.onJoinGroupCallClick,
+      onClick: this.onJoinGroupCallClick.bind(this),
       verify: this.verifyVideoChatButton.bind(this, 'broadcast')
     }, {
       icon: 'videochat',
       text: 'PeerInfo.Action.VoiceChat',
-      onClick: this.onJoinGroupCallClick,
+      onClick: this.onJoinGroupCallClick.bind(this),
       verify: this.verifyVideoChatButton.bind(this, 'group')
     }, {
       icon: 'topics',
@@ -501,12 +516,11 @@ export default class ChatTopbar {
       verify: () => this.managers.appProfileManager.canViewStatistics(this.peerId)
     }, {
       icon: 'addboost',
-      text: 'Boosts',
+      text: 'BoostsViaGifts.Title',
       onClick: () => {
-        this.appSidebarRight.createTab(AppBoostsTab).open(this.peerId);
-        this.appSidebarRight.toggleSidebar(true);
+        PopupElement.createPopup(PopupBoostsViaGifts, this.peerId);
       },
-      verify: () => this.chat.isBroadcast && this.managers.appProfileManager.canViewStatistics(this.peerId)
+      verify: async() => await this.managers.appPeersManager.isBroadcast(this.peerId) && this.managers.appChatsManager.hasRights(this.peerId.toChatId(), 'create_giveaway')
     }, {
       icon: 'bots',
       text: 'Settings',
@@ -625,9 +639,36 @@ export default class ChatTopbar {
     this.chat.appImManager.callUser(this.peerId.toUserId(), type);
   }
 
-  private onJoinGroupCallClick = () => {
-    this.chat.appImManager.joinGroupCall(this.peerId);
-  };
+  private async onJoinGroupCallClick() {
+    const chatFull = await this.managers.appProfileManager.getChatFull(this.peerId.toChatId());
+    if(chatFull._ === 'channelFull' && this.chat.isBroadcast && !chatFull?.call?.id) {
+      try {
+        const stream = new LiveStream(this.peerId);
+        const rtmpInfo = await stream.getURLAndKey()
+        PopupElement.createPopup(PopupStreamControl,  'stream-with', {
+          isStartStream: true,
+          peerId: this.peerId,
+          rtmpInfo,
+          mainBtnCallback: async() => {
+            await stream.join()
+            new AppMediaViewerStream(stream).openStream();
+          },
+          keyUrlController: new KeyUrlElementsController(rtmpInfo)
+        }).show();
+      } catch(e) {
+        console.error('Cant open start with window, connecting to stream', e)
+        this.chat.appImManager.joinGroupCall(this.peerId);
+      }
+    } else {
+      if(this.joinStream.isRTMPStream) {
+        const stream = new LiveStream(this.peerId, chatFull.call);
+        await stream.join()
+        new AppMediaViewerStream(stream).openStream();
+      } else {
+        this.chat.appImManager.joinGroupCall(this.peerId);
+      }
+    }
+  }
 
   private get peerId() {
     return this.chat.peerId;
@@ -646,7 +687,7 @@ export default class ChatTopbar {
     this.btnMute = ButtonIcon('mute');
 
     this.attachClickEvent(this.btnCall, this.onCallClick.bind(this, 'voice'));
-    this.attachClickEvent(this.btnGroupCall, this.onJoinGroupCallClick);
+    this.attachClickEvent(this.btnGroupCall, this.onJoinGroupCallClick.bind(this));
 
     this.attachClickEvent(this.btnPinned, () => {
       this.openPinned(true);
@@ -871,18 +912,6 @@ export default class ChatTopbar {
     this.status?.destroy();
     const status = this.status = this.createStatus();
 
-    const promises = [
-      this.managers.appPeersManager.isBroadcast(peerId),
-      this.managers.appPeersManager.isAnyChat(peerId),
-      peerId.isAnyChat() ? apiManagerProxy.getChat(peerId.toChatId()) : undefined,
-      newAvatar?.readyThumbPromise,
-      this.setTitleManual(),
-      status?.prepare(true),
-      apiManagerProxy.getState(),
-      modifyAckedPromise(this.chatRequests.setPeerId(peerId)),
-      modifyAckedPromise(this.chatActions.setPeerId(peerId))
-    ] as const;
-
     const [
       isBroadcast,
       isAnyChat,
@@ -893,7 +922,17 @@ export default class ChatTopbar {
       state,
       setRequestsCallback,
       setActionsCallback
-    ] = await Promise.all(promises);
+    ] = await Promise.all([
+      this.managers.appPeersManager.isBroadcast(peerId),
+      this.managers.appPeersManager.isAnyChat(peerId),
+      peerId.isAnyChat() ? apiManagerProxy.getChat(peerId.toChatId()) : undefined,
+      newAvatar?.readyThumbPromise,
+      this.setTitleManual(),
+      status?.prepare(true),
+      apiManagerProxy.getState(),
+      modifyAckedPromise(this.chatRequests.setPeerId(peerId)),
+      modifyAckedPromise(this.chatActions.setPeerId(peerId))
+    ]);
 
     if(!middleware() && newAvatarMiddlewareHelper) {
       newAvatarMiddlewareHelper.destroy();
@@ -962,6 +1001,9 @@ export default class ChatTopbar {
         this.pinnedMessage.destroy();
         this.pinnedMessage = undefined;
       }
+
+      this.joinStream.setCurrChatId(this.peerId.toChatId())
+      this.btnGroupCall.classList.toggle('not-needed', this.chat.isBroadcast);
 
       setTitleCallback();
       setStatusCallback?.();
@@ -1036,7 +1078,7 @@ export default class ChatTopbar {
       if(count === undefined) {
         const historyStorage = await this.chat.getHistoryStorage();
         if(!middleware()) return;
-        el.compareAndUpdate(historyStorage.count === null ? {key: 'Loading', args: undefined} : {args: [historyStorage.count]});
+        el.compareAndUpdate({args: [historyStorage.count]});
       }
 
       titleEl = el.element;
@@ -1110,6 +1152,7 @@ export default class ChatTopbar {
   public setFloating = () => {
     const containers = [
       this.chatAudio,
+      this.joinStream,
       this.chatRequests,
       this.chatActions,
       this.pinnedMessage?.pinnedMessageContainer
@@ -1136,7 +1179,7 @@ export default class ChatTopbar {
     const historyStorageKey = this.chat.historyStorageKey;
     const onHistoryCount: (data: BroadcastEvents['history_count']) => void = ({historyKey, count}) => {
       if(historyStorageKey === historyKey) {
-        el.compareAndUpdate({key, args: [count]});
+        el.compareAndUpdate({args: [count]});
       }
     };
 

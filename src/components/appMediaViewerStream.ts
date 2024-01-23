@@ -144,6 +144,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 
     this.content.main.middlewareHelper = this.middlewareHelper.get().create();
     this.video = createVideo({pip: true, middleware: this.content.main.middlewareHelper.get()});
+    this.video.autoplay = true;
 
     this.content.container.append(this.video);
     this.overlaysDiv.append(mainDiv);

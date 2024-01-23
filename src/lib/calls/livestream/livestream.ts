@@ -18,6 +18,23 @@ function submitSourceBuffer(s: SourceBuffer, b: ArrayBuffer) {
   return pr
 }
 
+// I hate safari
+function createClickToPlay() {
+  const clickToPlay = document.createElement('div')
+  clickToPlay.className = 'streamClickToPlay'
+  clickToPlay.innerText = 'Click to play stream'
+  clickToPlay.style.background = 'rgba(0, 0, 0, 0.5)'
+  clickToPlay.style.color = '#fff'
+  clickToPlay.style.position = 'absolute'
+  clickToPlay.style.top = '50%'
+  clickToPlay.style.left = '50%'
+  clickToPlay.style.transform = 'translate(-50%, -50%)'
+  clickToPlay.style.padding = '10px'
+  clickToPlay.style.borderRadius = '10px'
+  clickToPlay.style.fontSize = '48px'
+  return clickToPlay
+}
+
 class LiveStreamSource {
   private chunkStep: number
   private nextchunkTime: number
@@ -81,11 +98,7 @@ class LiveStreamSource {
       this.mediaSource.addEventListener('sourceopen', () => resolve())
     )
     this.videoSource = this.mediaSource.addSourceBuffer('video/mp4; codecs="avc1.64001f";')
-
-    if(!IS_SAFARI) {
-      this.audioSource = this.mediaSource.addSourceBuffer('audio/webm; codecs="opus";')
-      this.audioSource.mode = 'sequence'
-    }
+    this.audioSource = this.mediaSource.addSourceBuffer('audio/webm; codecs="opus";')
   }
 
   async addMp4Frag(frag: Uint8Array, time: number) {
@@ -96,7 +109,30 @@ class LiveStreamSource {
       await submitSourceBuffer(this.videoSource, videoInit)
       if(this.audioSource)
         await submitSourceBuffer(this.audioSource, new Uint8Array(createOpusWebmInit(OPUS_FORCE_MONO)).buffer)
-      this.video.play()
+      this.video.play().catch((e) => {
+        console.warn('failed to start video', e)
+        if(!this.video.paused && !this.video.ended) return;
+        
+        let clickToPlay = this.video.parentElement.querySelector('.streamClickToPlay')
+
+        if(!clickToPlay) {
+          clickToPlay = createClickToPlay()
+          this.video.parentElement.appendChild(clickToPlay)
+        }
+
+        document.body.addEventListener(
+          'click',
+          (e) => {
+            this.video.play()
+            if(clickToPlay)
+              clickToPlay.remove()
+            e.stopPropagation()
+            e.preventDefault()
+            e.stopImmediatePropagation()
+          },
+          {capture: true, once: true}
+        )
+      })
     }
 
     for(const vbuf of videoBufs) {

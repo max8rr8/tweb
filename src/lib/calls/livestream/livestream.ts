@@ -112,7 +112,7 @@ class LiveStreamSource {
       this.video.play().catch((e) => {
         console.warn('failed to start video', e)
         if(!this.video.paused && !this.video.ended) return;
-        
+
         let clickToPlay = this.video.parentElement.querySelector('.streamClickToPlay')
 
         if(!clickToPlay) {
